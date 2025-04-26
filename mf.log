@@ -1,0 +1,6 @@
+info (20190728.000618): Programm ./mf.pl gestartet
+trace (20190728.000619): scene init: 1, -1
+error (20190728.000627): glFehler: s1_show Hintergrund bindTex, invalid framebuffer operation
+error (20190728.000627): glFehler: s1_show Hintergrund showObj, invalid framebuffer operation
+error (20190728.000627): glFehler: s1_show objWuerfel , invalid framebuffer operation
+trace (20190728.000636): scene setAction: 1, 100

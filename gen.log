@@ -1,0 +1,37 @@
+info (20190831.172828): Programm ./gen.pl gestartet
+trace (20190831.172828): cnfGet: MUSIK, MP3_DIR = /Volumes/home/jack/Music/mp3
+trace (20190831.172828): cnfGet: MUSIK, PLAYLIST_DIR = /Volumes/home/jack/Music/playlisten
+trace (20190831.172828): cnfGet: MUSIK, DATA_DIR = data
+trace (20190831.172828): cnfGet: MUSIK, MASTER_FILE = data/master.sto
+trace (20190831.172828): cnfGet: MUSIK, AKT_PLAYLIST = conf.txt
+trace (20190831.172828): cnfGet: MUSIK, PLAYLIST_TRENNER = ;
+trace (20190831.172828): Playlist: Text: master File: master.m3u
+trace (20190831.172836): /Volumes/home/jack/Music/playlisten/master.m3u: Interpreten 289 Nr: 7538
+trace (20190831.172836): Playlist: Text: Joachim File: jack_bestof.m3u
+trace (20190831.172838): /Volumes/home/jack/Music/playlisten/jack_bestof.m3u: Lieder: 1131
+trace (20190831.172838): Playlist: Text: Schöne Lieder von Joachim File: jack_bestof_rand.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/jack_bestof_rand.m3u: Lieder: 1131
+trace (20190831.172839): Playlist: Text: Carola File: carola_bestof.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/carola_bestof.m3u: Lieder: 195
+trace (20190831.172839): Playlist: Text: Schöne Lieder von Carola File: carola_bestof_rand.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/carola_bestof_rand.m3u: Lieder: 195
+trace (20190831.172839): Playlist: Text: Icky Flix Sammlung 1 File: icky01.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/icky01.m3u: Lieder: 19
+trace (20190831.172839): Playlist: Text: Icky Flix Sammlung 2 File: icky02.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/icky02.m3u: Lieder: 19
+trace (20190831.172839): Playlist: Text: Icky Flix Sammlung 3 File: icky03.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/icky03.m3u: Lieder: 20
+trace (20190831.172839): Playlist: Text: Icky Flix Sammlung 4 File: icky04.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/icky04.m3u: Lieder: 18
+trace (20190831.172839): Playlist: Text: Icky Flix Sammlung 5 File: icky05.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/icky05.m3u: Lieder: 17
+trace (20190831.172839): Playlist: Text: Icky Flix Sammlung 6 File: icky06.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/icky06.m3u: Lieder: 14
+trace (20190831.172839): Playlist: Text: Mixture 1 File: mix01.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/mix01.m3u: Lieder: 17
+trace (20190831.172839): Playlist: Text: Lieder vom Olymp File: olymp.m3u
+trace (20190831.172839): /Volumes/home/jack/Music/playlisten/olymp.m3u: Lieder: 17
+trace (20190831.172839): Playlist: Text: Alles File: all.m3u
+trace (20190831.172847): /Volumes/home/jack/Music/playlisten/all.m3u: Lieder: 7538
+trace (20190831.172847): Playlist: Text: Alles zufällig File: all_rand.m3u
+trace (20190831.172855): /Volumes/home/jack/Music/playlisten/all_rand.m3u: Lieder: 7538

@@ -1,0 +1,12 @@
+# Blender v2.63 (sub 0) OBJ File: 'font.blend'
+# www.blender.org
+mtllib 44.mtl
+o Text
+v 0.101996 0.104900 0.000000
+v 0.174592 0.076588 0.000000
+v 0.071143 -0.130672 -0.000000
+v 0.015971 -0.107804 -0.000000
+usemtl 
+s off
+f 2 1 4
+f 4 3 2

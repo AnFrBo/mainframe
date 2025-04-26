@@ -1,0 +1,18 @@
+tell application "QuickTime Player"
+	activate
+	try
+		set movieFile to ((Macintosh HD:Users:jack:Music:film:Pink:) & "02_Most Girls.m4v" as text) as alias
+	on error errorMsg number errorNum
+		display alert errorMsg & space & errorNum message "An error occured trying to find the file " & movieFile & "." & return & "Check the file path exists, and the file spelling." as warning giving up after 60
+	end try
+	try
+		open movieFile with presenting
+		delay (0.25)
+		present document 1
+		delay (0.25)
+		set looping of document 1 to true
+		play document 1 with looping
+	on error errorMsg number errorNum
+		display alert errorMsg & space & errorNum message "An error occured trying to open & play the file " & movieFile & "." & return & "Check the file path exists, and the set delay time" as warning giving up after 60
+	end try
+end tell

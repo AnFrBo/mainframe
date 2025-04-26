@@ -1,0 +1,433 @@
+#!/opt/local/bin/perl
+
+use strict;
+use warnings;
+
+use IPC::Open2;
+use Storable;
+use Term::ReadKey;
+use Getopt::Long;
+use Cwd;
+use File::Copy;
+
+use sigtrap qw/handler signal_handler normal-signals/;
+
+# #####################################
+#
+# meine Konfiguration
+#
+# #####################################
+
+my $mp3Prog    = "/opt/local/bin/mpg123";
+#my $mp3Prog      = "/usr/local/bin/mpg123";
+my $mp3_status   = "mp3_stat.txt";
+my $tmp_mp3Datei = "/Volumes/ramdisk/t.mp3";
+my $peri_dat     = "peri.sto";
+
+use constant {
+             ALARM_INTERVAL         => 1,
+
+             PL_STOP                => 0,
+             PL_PAUSE               => 1,
+             PL_PLAY                => 2,
+
+             VOL_OFFSET_INTERVAL    => 10,
+             };
+
+# #####################################
+#
+# globale Variablen
+#
+# #####################################
+
+my ($Reader, $Writer);
+
+my $napTime;
+my $pid;
+my $akt_sec;
+my $status;
+my @t;
+my (%peri, %pl);
+my $ende_flag = 0;
+my $vol_offset = 0;
+my $volumen;
+my $child_exit_status;
+
+my $playlist  = "";
+my $lied_nr   = 0;
+my $quiet     = 0;
+my $verbose   = 0;
+my $ramdisk   = 0;
+
+######################################
+#
+# STDOUT soll unbuffered sein
+#
+# #####################################
+
+select STDOUT;
+$| = 1;
+
+# #####################################
+#
+# mein Signal Handler
+#
+# #####################################
+
+alarm( 0 );
+local $SIG{ALRM} = \&alarm_handler;
+
+sub signal_handler {
+    ReadMode 0; # Normaler Terminal Mode
+    print "Caught a signal: $!";
+}
+
+# #####################################
+#
+# starte den Player
+#
+# #####################################
+
+&initTerm();
+
+# #####################################
+#
+# der Terminal Mode    
+#
+# #####################################
+
+sub initTerm {
+
+    # #####################################
+    #
+    # hole die Optionen
+    #
+    # #####################################
+
+    GetOptions	( 
+                "playlist=s"    =>	\$playlist,
+                "nummer=i"      =>  \$lied_nr,
+                "quiet"         =>  \$quiet,
+                "verbose"       =>  \$verbose,
+                "ramdisk"       =>  \$ramdisk
+                );
+
+    # #####################################
+    #
+    # ueberpruefe ob es eine Ramdisk gibt
+    #
+    # #####################################
+
+    if( ! (-d "/Volumes/ramdisk" ) && $ramdisk ) {
+        &mkRamdisk( "ramdisk", 100 );
+    }
+
+    # #####################################
+    #
+    # lese die Playlist mit Persistenz
+    #
+    # #####################################
+
+    if( $playlist eq "" ) {
+        if( -f $peri_dat ) {
+            %peri = %{ retrieve( $peri_dat ) };
+            $playlist = $peri{'PLAYER'}{'PLAYLIST'};
+            if( $lied_nr == 0 ) {
+                $lied_nr  = $peri{'PLAYER'}{'LIED_NR'};
+            }
+            if( exists( $peri{'PLAYER'}{'VOLUMEN_OFFSET'} )) {
+                $vol_offset = $peri{'PLAYER'}{'VOLUMEN_OFFSET'};
+            }
+        } else {
+            print "Usage: player.pl [-i term|no] [-p playlist] [-n liednummer] [-quiet]\n";
+            die;
+        }
+    }
+
+    if( -f $playlist ) {
+        %pl = %{ retrieve( getcwd() . "/" . $playlist ) };
+        $peri{'PLAYER'}{'PLAYLIST'} = $playlist;
+    } else {
+        print "Kann $playlist nicht finden.\n";
+        die;
+    }
+
+    $peri{'PLAYER'}{'LIED_NR'}  = $lied_nr;
+    store( \%peri, $peri_dat );
+
+    if( $verbose && ! $quiet ) {
+        print "Playlist Datei:    $playlist\n";
+        print "Persistenz Datei:  $peri_dat\n";
+        print "Aktuelle Lied Nr.: $lied_nr\n";
+        print "Maximale Lied Nr.: $pl{'MAX_LIED'}\n";
+    }
+
+    # #####################################
+    #
+    # Spiele
+    #
+    # #####################################
+
+    while( 1 ) {
+
+        if( $lied_nr > $pl{'MAX_LIED'} ) {
+            $lied_nr = 0;
+        }
+
+        $volumen = $pl{$lied_nr}{'VOL'};
+
+        if( ! $quiet ) {
+            @t = split( /\//, $pl{$lied_nr}{'MP3_FILE'} );
+            my $interpret = $t[$#t -2];
+            my $album     = $t[$#t -1];
+            my $lied      = substr($t[$#t], 0, 2);
+            my $titel     = substr($t[$#t], 3, length($t[$#t]) -7);
+            print "Nr.: $lied_nr Vol: $volumen($vol_offset) $interpret,$album,$lied,$titel\n";
+        }
+
+        &spieleMp3( $pl{$lied_nr}{'MP3_FILE'}, $pl{$lied_nr}{'VOL'} );
+        waitpid( $pid, 0 );
+
+        $child_exit_status = $? >> 8;
+
+        if( $verbose ) {
+            print "Child Exit Status: $child_exit_status\n";
+        }
+
+        if( $ende_flag ) {
+            ReadMode 0; # Normaler Terminal Mode
+            if( ! $quiet ) {
+                print "Tschuess\n";
+            }
+            return;
+        }
+
+        $peri{'PLAYER'}{'LIED_NR'} = ++$lied_nr;
+        store( \%peri, $peri_dat );
+    }
+}
+
+# #####################################
+#
+# starte den Player
+#
+# #####################################
+
+sub spieleMp3 {
+
+    my( $mp3Datei, $vol ) = @_;
+
+    if( $status ) {
+        print $Writer "QUIT\n";
+        close( $Writer );
+        alarm( 0 );     # Alarm abschalten
+    }
+
+    # Kopiere das Mp3 File in die Ramdisk
+    if( $ramdisk ) {
+        copy( $mp3Datei, $tmp_mp3Datei );
+    } else {
+        $tmp_mp3Datei = $mp3Datei;
+    }
+
+    ReadMode 0;         # Normaler Terminal Mode
+    $pid = open2($Reader, $Writer, "$mp3Prog -R >$mp3_status 2>/dev/null");
+    close( $Reader );   # den Reader brauche ich nicht
+    ReadMode 4;         # Raw Terminal Mode
+
+    my $vol_akt = $vol + $vol_offset;
+    if( $vol_akt > 100 ) { $vol_akt = 100; }
+    if( $vol_akt <  10 ) { $vol_akt =  10; }
+
+    print $Writer "VOLUME $vol_akt\n";
+    print $Writer "LOAD $tmp_mp3Datei\n";
+
+    $akt_sec = 0;
+    $status  = PL_PLAY;
+    $napTime = ALARM_INTERVAL;
+
+    alarm( $napTime );
+
+}
+
+# #####################################
+#
+# mein Alarm Handler
+#
+# #####################################
+
+sub alarm_handler {
+
+    alarm( 0 );         # Alarm ausschalten
+    &getMp3Status();
+    alarm( $napTime );  # Alarm einschalten
+
+}
+
+# #####################################
+#
+# der Liedstatus und die Tasten Eingabe
+#
+# #####################################
+
+sub getMp3Status {
+
+    # wurde eine Taste gedrueckt ?
+    if( defined( my $key = ReadKey(-1))) {
+        &verarbeite( $key );
+    } else {
+
+        # Lese die letzte Zeile der Datei
+        # die @F Zeile ist so ungefaehr 25 Byte lang
+        open my $STATUS_DATEI, "<", $mp3_status || &beende();
+        seek( $STATUS_DATEI, -64, 2 );
+        @t = <$STATUS_DATEI>;
+        close $STATUS_DATEI;
+
+        if( @t ) {
+
+            chomp( $t[$#t] );
+
+            if( $t[$#t] eq '@P 0' ) {
+                print $Writer "QUIT\n";
+                close( $Writer );
+                $status  = PL_STOP;
+                $napTime = 0;   # Alarm ausschalten
+            } else {
+                @t = split( /\s/, $t[$#t] );
+                if( $t[0] eq '@F' ) {
+                    $akt_sec = int($t[3]);
+                }
+            }
+        }
+    }
+}
+
+# #####################################
+#
+# Notabschaltung
+#
+# #####################################
+
+sub beende {
+
+    ReadMode 0;
+    alarm( 0 );
+    die $!;
+}
+
+
+# #####################################
+#
+# Keys im Terminal Modus
+#
+# #####################################
+
+sub verarbeite {
+
+    my $key = shift @_;
+
+    # pause
+    if( $key eq ' ' ) {
+        print $Writer "PAUSE\n";
+        if( ++$status > PL_PLAY ) {
+            $status = PL_PAUSE;
+        }
+    }
+
+    # quit
+    if( lc($key) eq 'q' ) {
+        print $Writer "QUIT\n";
+        close( $Writer );
+        $status    = PL_STOP;
+        $napTime   = 0;
+        $ende_flag = 1;
+    }
+
+    # next
+    if( lc($key) eq 'n' ) {
+        print $Writer "QUIT\n";
+        close( $Writer );
+        $status  = PL_STOP;
+        $napTime = 0;
+    }
+
+    # back
+    if( lc($key) eq 'b' ) {
+        print $Writer "QUIT\n";
+        close( $Writer );
+        $status   = PL_STOP;
+        $napTime  = 0;
+        $lied_nr -= 2;
+        if( $lied_nr < 0 ) {
+            $lied_nr = 0;
+        }
+    }
+
+    # Volumen # auf 0
+    if( lc($key) eq '#' ) {
+
+        $vol_offset = 0;
+
+        print $Writer "VOLUME $volumen\n";
+        $peri{'PLAYER'}{'VOLUMEN_OFFSET'} = 0;
+    }
+
+    # Volumen +
+    if( lc($key) eq '+' ) {
+        $vol_offset += VOL_OFFSET_INTERVAL;
+
+        if( $vol_offset > 10 ) {
+            $vol_offset = 10;
+        }
+
+        my $vol_akt = $volumen + $vol_offset;
+        if( $vol_akt > 100 ) {
+            $vol_akt = 100;
+        }
+        print $Writer "VOLUME $vol_akt\n";
+        $peri{'PLAYER'}{'VOLUMEN_OFFSET'} = $vol_offset;
+    }
+
+    # Volumen -
+    if( lc($key) eq '-' ) {
+        $vol_offset -= VOL_OFFSET_INTERVAL;
+
+        if( $vol_offset < -70 ) {
+            $vol_offset = -70;
+        }
+
+        my $vol_akt = $volumen + $vol_offset;
+        if( $vol_akt < 10 ) {
+            $vol_akt = 10;
+        }
+        print $Writer "VOLUME $vol_akt\n";
+        $peri{'PLAYER'}{'VOLUMEN_OFFSET'} = $vol_offset;
+    }
+}
+
+
+# #####################################
+#
+# eine Ramdisk wird erzeugt
+#
+# #####################################
+
+sub mkRamdisk {
+
+    my ($ramdisk_name, $ramdisk_size_mb) = @_;
+
+    if( ! $quiet  && ! $verbose ) {
+        print "Erzeuge $ramdisk_name mit $ramdisk_size_mb MB\n";
+    }
+
+    my $ramdisk_size = $ramdisk_size_mb * 2000;
+
+    system( "diskutil erasevolume HFS+ $ramdisk_name " . 
+            "`hdiutil attach -nomount ram://$ramdisk_size`" .
+            " >/dev/null 2>/dev/null" );
+
+}
+
+
+1;
